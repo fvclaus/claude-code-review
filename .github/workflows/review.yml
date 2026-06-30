@@ -18,6 +18,29 @@ jobs:
   claude:
     runs-on: ubuntu-latest
     steps:
+      - name: Check required permissions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          check() {
+            local label=$1 url=$2
+            local status
+            status=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/$url")
+            if [ "$status" = "403" ] || [ "$status" = "404" ]; then
+              echo "::error::Missing permission: $label (HTTP $status). Add it to the calling job's permissions block."
+              return 1
+            fi
+          }
+          failed=0
+          check "pull-requests: write" "repos/${{ github.repository }}/pulls" || failed=1
+          check "issues: write"        "repos/${{ github.repository }}/issues" || failed=1
+          check "actions: read"        "repos/${{ github.repository }}/actions/runs?per_page=1" || failed=1
+          check "id-token: write (OIDC)" "repos/${{ github.repository }}" || failed=1
+          exit $failed
+
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
