@@ -14,10 +14,35 @@ on:
       claude_code_oauth_token:
         required: true
 
+permissions: {}
+
 jobs:
   claude:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      actions: read
+      id-token: write
     steps:
+      - name: React with eyes to signal start
+        if: github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        run: |
+          if [ "$EVENT_NAME" = "issue_comment" ]; then
+            endpoint="repos/$REPOSITORY/issues/comments/$COMMENT_ID/reactions"
+          else
+            endpoint="repos/$REPOSITORY/pulls/comments/$COMMENT_ID/reactions"
+          fi
+          gh api --method POST "$endpoint" -f content=eyes
+
       - name: Check required permissions
         env:
           GH_TOKEN: ${{ github.token }}
@@ -88,3 +113,15 @@ jobs:
             2. Run: `gh pr comment --body-file /tmp/review.md`
 
             Do NOT use `gh pr review` — use `gh pr comment` so it appears as a regular comment in the conversation.
+
+      - name: Notify on pipeline failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh pr comment "$PR_NUMBER" \
+            --repo "$REPOSITORY" \
+            --body "**Claude Code Review:** The pipeline failed. See the [workflow run]($RUN_URL) for details."
