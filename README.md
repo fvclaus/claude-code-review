@@ -21,6 +21,20 @@ A Claude Code skill that turns a reviewer's past PR comments into an improved re
 
 Claude will ask for scope, time window, reviewer filter, and the current prompt to improve.
 
+## Setup
+
+1. Generate a Claude Code OAuth token by running `claude setup-token` in a terminal. It only prints the token; GitHub cannot see it yet.
+2. Save it as a repository secret named `CLAUDE_CODE_OAUTH_TOKEN`. Paste the token at the prompt so it does not end up in shell history:
+
+   ```
+   gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo <owner>/<repo>
+   ```
+
+   Or use the UI: Settings → Secrets and variables → Actions → New repository secret. An organisation secret works too.
+3. Add the caller workflow from [Usage](#usage). The secret name in the caller (`secrets.CLAUDE_CODE_OAUTH_TOKEN`) must match the name you saved.
+
+Without the secret the workflow fails at the Claude step.
+
 ## Usage
 
 ```yaml
@@ -79,6 +93,8 @@ The calling job must grant:
 | `contents` | `read` | Check out the repository |
 
 A preflight step verifies these at the start of each run and emits a clear error if any are missing.
+
+Note: GitHub does not allow `timeout-minutes` on a job that calls a reusable workflow, so the caller cannot set one. The job inside `review.yml` uses the GitHub default of 360 minutes.
 
 ## Custom prompt example
 
